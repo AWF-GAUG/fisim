@@ -1,6 +1,6 @@
 #' Simple random sampling estimator of population means
 #'
-#' @param data A data.table object with plot-level information of stand
+#' @param point_data A data.table object with plot-level information of stand
 #'   characteristics as coming from the \code{sum_data} function.
 #' @param est_col A character vector of column names for which estimates are
 #'   produced. Used when there is more than one way to expand observations from
@@ -26,7 +26,7 @@ est_srs <- function(point_data, est_col = NULL) {
   dt_est <- point_data$data[,
                             list(est_appr = names(.SD),
                                  y_hat = sapply(.SD, mean),
-                                 v_hat = sapply(.SD, var)/.N),
+                                 v_hat = sapply(.SD, stats::var)/.N),
                             by = list(id_sample, variable),
                             .SDcols = est_col];
   return(dt_est);
