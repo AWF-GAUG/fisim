@@ -45,8 +45,10 @@
 #' @export
 #'
 #' @examples
-#' library(spatstat);
-#' xy_sample(letterR, n = 10, M = 10, method = "random");
+#' library(sf)
+#' poly <- st_polygon(list(rbind(c(0,0), c(1,0), c(3,2), c(2,4), c(1,4), c(0,0)),
+#'                         rbind(c(1,1), c(1,2), c(2,2), c(1,1))))
+#' xy_sample(poly, n = 10, M = 10, method = "random");
 sample_loc <- function(data, n, M, method) {
   if (!is.data.table(data)) {
     stop("'data' is not a data.table object!");
@@ -100,8 +102,8 @@ is.sample_loc <- function(x) {
 #'   individual trees in a forest. Each row represents a tree, while tree
 #'   attributes are stored in columns. A minimum set of attributes with specific
 #'   columns names is required; see Details section.
-#' @param boundary A \code{\link[sp]{SpatialPolygons}} object that defines the
-#'   border of the forest.
+#' @param boundary An \code{\link[sf]{sf}} object of geometry type POLYGON that
+#'   defines the border of the forest.
 #'
 #' @details The following columns are needed as a minimum requirement in
 #'   \code{data}:
@@ -157,17 +159,17 @@ is.sample_loc <- function(x) {
 #'   \enumerate{
 #'   \item \code{$data} A \code{\link[data.table]{data.table}}
 #'   object as described above.
-#'   \item \code{$boundary} A \code{\link[sp]{SpatialPolygons}} object that
-#'   defines the border of the forest.
+#'   \item \code{$boundary} A \code{\link[sf]{sf}} object of geometry type
+#'   POLYGON that defines the border of the forest.
 #'   }
 #' @export
 tree_pop <- function(data, boundary) {
   if (!is.data.table(data)) {
     stop("'data' is not a data.table object!");
   }
-  sp_class <- c("SpatialPolygons", "SpatialPolygonsDataFrame");
-  if (is.na(match(class(boundary), sp_class))) {
-    stop("'boundary' neither of class 'SpatialPolygons' nor of class 'SpatialPolygonsDataFrame'");
+  if (!inherits(boundary, 'sf') ||
+      sf::st_geometry_type(boundary) %in% c("POLYGON", "MULTIPOLYGON")) {
+    stop("'boundary' neither of class 'POLYGON' nor 'MULTIPOLYGON'");
   }
   col_names <- c("id_tree", "id_stem", "x_tree", "y_tree", "is_dead", "dbh");
   if (sum(is.na(match(col_names, names(data)))) > 0) {
@@ -175,7 +177,7 @@ tree_pop <- function(data, boundary) {
   }
   x_range <- data[, range(x_tree)];
   y_range <- data[, range(y_tree)];
-  ext <- bbox(boundary);
+  ext <- sf::st_bbox(boundary);
   if (x_range[1] < ext["x", "min"]) {
     stop("x-coordinate in 'data' smaller than extent of 'boundary'");
   }
@@ -219,20 +221,14 @@ is.tree_pop <- function(x) {
 #'
 #' @param data A \code{\link[data.table]{data.table}} object holding identifiers
 #'   for the sample and respective point locations and row indices that indicate
-#'   which population elements are selected into the sample.
+#'   which population elements are selected into the sample. data must have
+#'   the columns "id_sample", "id_point", "s" and "ef".
 #' @param r_design A \code{character} string indicating the type of the response
 #'   design. One of the following: "fixed_area", "k_tree", "angle_count".
 #' @param r_design_parm A response design specific parameter of type
 #'   \code{numeric}. For "fixed_area" the plot radius in meter; for "k_tree" the
 #'   number of trees closest to the sample location; for "angle_count" the basal
 #'   area factor.
-#' @param ef The expansion factor, i.e., the factor that is used to prorate tree
-#'   attributes to per hectare values (the inverse of the inclusion
-#'   probabilities). Provided by the particular response design functions.
-#' @param ef_alt1 Alternative expansion factor that may be applied when using
-#'   k-tree sampling.
-#' @param ef_alt2 A third alternative expansion factor approximation for k-tree
-#'   sampling
 #'
 #' @details The \code{\link[data.table]{data.table}} object (\code{data}) should
 #'   have the following columns:
@@ -281,11 +277,13 @@ is.response <- function(x) {
   inherits(x, "response");
 }
 
+
+#' Tree Sample
+#'
 #' The function \code{tree_sample} creates tree sample objects. Such objects
 #' assign individual tree information from the population to the sample
 #' locations following a particular response design. The function is only used
 #' internally by \code{\link{extract_data}}.
-#'
 #'
 #' @param data A \code{\link[data.table]{data.table}} object holding individual
 #'   tree data together with identifiers that indicate the sample and the point
@@ -316,8 +314,8 @@ is.response <- function(x) {
 #'
 #'   Some response designs (currently only \code{\link{k_tree}}), may have
 #'   additional alternative expansion factors as optional approximations, where
-#'   unbiased estimators are missing or difficult to derive. As the column names
-#'   for these alternatives \code{ef_alt1} and \code{ef_alt2} are used.
+#'   unbiased estimators are missing or difficult to derive. These additional
+#'   columns are \code{ef_alt1} and \code{ef_alt2}.
 #'
 #' @return
 #'  \enumerate{

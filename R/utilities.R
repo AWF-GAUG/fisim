@@ -1,8 +1,8 @@
 #' Helper function to extract population elements into a sample using a list of
 #' indices
 #'
-#' @param dt_pop The population from which to extract sampled elements.
-#' @param s An integer matrix where rows represent sample locations and columns
+#' @param tree_pop The population from which to extract sampled elements.
+#' @param response An integer matrix where rows represent sample locations and columns
 #'   represent indices of the trees in \code{dt_pop} that are selected at the
 #'   individual sample locations. Zeroes are used to indicate no neighbours and
 #'   to ensure a rectangular data format.
@@ -42,7 +42,7 @@ extract_data <- function(tree_pop, response) {
 #'
 #' @param tree_sample A \code{\link{tree_sample}} object as coming from
 #'   the \code{\link{extract_data}} function.
-#' @param target_var A character vector of variable names which should be
+#' @param target_vars A character vector of variable names which should be
 #'   summarized at the plot level
 #'
 #' @return A data.table object with stand characteristics at the plot level.
@@ -88,7 +88,7 @@ sum_data <- function(tree_sample, target_vars) {
 #'
 #' @param tree_sample A \code{\link{tree_sample}} object as coming from the
 #'   \code{\link{extract_data}} function.
-#' @param target_var A character vector of variable names which should be
+#' @param target_vars A character vector of variable names which should be
 #'   summarized at the plot level
 #'
 #' @details For k-tree sampling, individual tree inlcusion probabilities can
@@ -157,7 +157,7 @@ sum_k_tree <- function(tree_sample, target_vars) {
 #'
 #' @param tree_sample A \code{\link{tree_sample}} object as coming from
 #'   the \code{\link{extract_data}} function.
-#' @param target_var A character vector of variable names which should be
+#' @param target_vars A character vector of variable names which should be
 #'   summarized at the plot level
 #'
 #' @return A data.table object with stand characteristics at the plot level.
@@ -240,8 +240,8 @@ edge_corr_wt <- function(tree_pop, tree_sample, sample_loc) {
             by = list(id_sample, id_point)];
 
   # Identify points outside border
-  wt_points <- sp::SpatialPoints(as.matrix(dt_s_tree[!is.na(x_tree), list(x_wt, y_wt)]));
-  idx <- which(rgeos::gWithin(wt_points, tree_pop$boundary, byid = TRUE) == FALSE);
+  wt_points <- sf::st_as_sf(as.data.frame(dt_s_tree[!is.na(x_tree), list(x_wt, y_wt)]), coords=1:2)
+  idx <- which(!sf::st_contains(tree_pop$boundary, wt_points, prepared=TRUE, sparse=FALSE))
 
   return(tree_sample(tree_sample$data[dt_s_tree[!is.na(x_wt)][idx, list(id_sample, id_point, id_tree, id_stem)],
                                       f_edge := 2,
@@ -251,21 +251,17 @@ edge_corr_wt <- function(tree_pop, tree_sample, sample_loc) {
 }
 
 
-#' Helper function to extract the area slots from
-#' \code{\link[sp]{SpatialPolygons}} objects
+#' Helper function to determine the area of the plot given by the boundary element
 #'
-#' @param sp_poly An object of class \code{\link[sp]{SpatialPolygons}}
+#' @param sf_poly An object of class \code{\link[sf]{sf}} and geometry type POLYGON
 #'
-#' @return A numeric vector with the areas of all polygons in the object. The
-#'   areas for polygons that represent holes are stored as negative values.
+#' @return A numeric vector with the areas of all polygons in the object.
+#'   Holes within the polygons are already subtracted.
+#'
 #' @examples
-#' library(sp);
-#' library(maptools);
-#' data("state.vbm");
-#' a <- extract_area(state.vbm);
+#' a <- extract_area(hberg_beech$boundary)
+#'
 #' @export
-extract_area <- function(sp_poly) {
-  return(unlist(lapply(sp_poly@polygons,
-                       function(x) lapply(x@Polygons,
-                                          function(x) x@area*x@ringDir))));
+extract_area <- function(sf_poly) {
+  return(sf::st_area(sf_poly));
 }
